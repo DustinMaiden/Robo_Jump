@@ -7,6 +7,7 @@ from kivy.clock import Clock
 from kivy.uix.label import Label
 from kivy.uix.button import Button
 from kivy.core.text import LabelBase
+from kivy.config import Config
 LabelBase.register(name="Robotech GP", fn_regular="ROBOTECH GP.ttf")
 
 
@@ -56,14 +57,14 @@ class Platform(Sprite):
         self.isextended = 0
         self.play_on = 0
 
-    def update(self,count):
+    def open(self,count):
         if count == 1:
             self.source='atlas://platform_atlas/platform_2'
         elif count == 2:
             self.source='atlas://platform_atlas/platform_3'
             self.isextended = 1
 
-    def update2(self, count):
+    def close(self, count):
         if count == 1:
             self.source='atlas://platform_atlas/platform_4'
         elif count == 2:
@@ -90,6 +91,7 @@ class Platform(Sprite):
 
 #########################################################################################
 
+
 class Title(Sprite):
     def __init__(self,pos):
         super(Title, self).__init__(pos=pos)
@@ -98,6 +100,7 @@ class Title(Sprite):
 
 
 #########################################################################################
+
 
 class Player(Sprite):
     def __init__(self, pos):
@@ -117,13 +120,13 @@ class Player(Sprite):
             self.velocity_y = 0
             self.gravity = 0
 
-    def update2(self, count):
+    def start_game(self, count):
         if self.ready == 0 and count % 2 == 0:
             self.source = 'atlas://robot_atlas/walk_left'
-            self.y += dp(5)
+            self.y += dp(20)
         elif self.ready == 0 and count % 2 != 0:
             self.source = 'atlas://robot_atlas/walk_right'
-            self.y += dp(5)
+            self.y += dp(20)
 
         if self.y >= dp(180):
             self.ready = 1
@@ -173,51 +176,21 @@ class Background(Widget):
 
 ##############################################################################################
 
+
 class Game(Widget):
     def __init__(self):
         super(Game, self).__init__()
         self.imager = 0
         self.imager3 = 0
         self.gameStart = 0
+        self.counter = 0
+        self.background1 = Background(source='background.png')
+        self.size = self.background1.size
 
-        self.background = Background(source='background.png')
-        self.size = self.background.size
-        self.add_widget(self.background)
-
-        self.Title = Title(pos=(dp(250),dp(450)))
-        self.add_widget(self.Title)
-
-        self.button1 = Button(text = 'Start Game', pos=(dp(200), dp(275)))
-        self.button1.bind(on_press=self.start)
-        self.add_widget(self.button1)
-
-        self.button2 = Button(text = 'Tutorial', pos=(dp(500), dp(275)))
-        self.add_widget(self.button2)
-        self.button2.bind(on_press=self.practice)
-
-    def update(self, *ignore):
-        self.Player.update()
-        self.Projectile.update()
-
-        #
-        # if self.Platform.ready_to_play() == 1:
-
-        if self.Projectile.collide_widget(self.Player) and self.Player.is_jump() == 0:
-            self.remove_widget(self.Title)
-
-    def update2(self, *ignore):
-        self.Platform.update(self.imager)
-
-        if self.Platform.extension() == 1 and self.Player.readiness() == 0:
-            self.Player.update2(self.imager)
-        elif self.Player.readiness() != 0:
-            self.Platform.update2(self.imager3)
-            self.imager3 += 1
-
-        self.imager += 1
+        Clock.schedule_interval(self.update_manager, 1.0 / 60.0)
 
 
-    def start(self, pos):
+    def start_game(self, pos):
         self.button1.x = dp(25)
         self.button1.y = dp(25)
         self.button1.text = 'Block Left'
@@ -226,25 +199,65 @@ class Game(Widget):
         self.button2.y = dp(25)
         self.button2.text = 'Block Right'
 
-        self.gameStart = 1
-
         self.Platform = Platform(pos=(dp(215), dp(0)))
         self.add_widget(self.Platform)
 
         self.Player = Player(pos=(dp(365), dp(50)))
         self.add_widget(self.Player)
 
-        self.Projectile = Projectile(pos=(dp(0), dp(425)))
-        self.add_widget(self.Projectile)
+        self.Projectiles = []
 
+        Clock.schedule_interval(self.startup, 1)
         Clock.schedule_interval(self.update, 1.0 / 60.0)
-        Clock.schedule_interval(self.update2, 1)
+
+
+    def update(self, dt):
+        self.counter += 1
+        self.Player.update()
+        if self.Platform.ready_to_play() == 1 and len(self.Projectiles) < 20:
+            if self.counter % 25 == 0:
+                Projectile_l = Projectile(pos=(dp(0), dp(425)))
+                self.Projectiles.append(Projectile_l)
+                self.add_widget(Projectile_l)
+
+        for proj in self.Projectiles:
+            proj.update()
+
+        # if self.Platform.ready_to_play() == 1:
+
+        #if self.Projectile.collide_widget(self.Player) and self.Player.is_jump() == 0:
+         #   self.remove_widget(self.Title)
+
+    def startup(self, *ignore):
+        self.Platform.open(self.imager)
+
+        if self.Platform.extension() == 1 and self.Player.readiness() == 0:
+            self.Player.start_game(self.imager)
+        elif self.Player.readiness() != 0:
+            self.Platform.close(self.imager3)
+            self.imager3 += 1
+
+        self.imager += 1
+
+    def update_manager(self, dt):
+        if self.gameStart == 0:
+            self.background = Background(source='background.png')
+            self.add_widget(self.background)
+
+            self.Title = Title(pos=(dp(250),dp(450)))
+            self.add_widget(self.Title)
+
+            self.button1 = Button(text = 'Start Game', pos=(dp(200), dp(275)))
+            self.button1.bind(on_press=self.start_game)
+            self.add_widget(self.button1)
+
+            self.button2 = Button(text = 'Tutorial', pos=(dp(500), dp(275)))
+            self.add_widget(self.button2)
+            self.button2.bind(on_press=self.practice)
+            self.gameStart = 1
 
     def practice(self, pos):
        self.button2.text='tomato'
-
-    #def shoot(self):
-
 
 ##############################################################################################
 
